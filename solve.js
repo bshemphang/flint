@@ -17,6 +17,8 @@
 // careful segment loop. No imports, no state kept between calls.
 
 const CR_RE = /\r\n?/g;
+const DELIM = /[,\n\r]/g;
+const NLCR = /[\n\r]/g;
 
 export function run(input) {
   const text = String(input.text);
@@ -167,15 +169,9 @@ export function run(input) {
           ended = f.ended;
           continue;
         }
-        const nl = text.indexOf('\n', pos + 1);
-        if (nl !== -1 && nl < q) {
-          const f = qtd();
-          fields.push(f.value);
-          ended = f.ended;
-          continue;
-        }
-        const cr = text.indexOf('\r', pos + 1);
-        if (cr !== -1 && cr < q) {
+        NLCR.lastIndex = pos + 1;
+        const nm = NLCR.exec(text);
+        if (nm !== null && nm.index < q) {
           const f = qtd();
           fields.push(f.value);
           ended = f.ended;
@@ -196,14 +192,23 @@ export function run(input) {
         ended = junk.ended;
       } else {
         lastQuoted = false;
-        const cIdx = text.indexOf(',', pos);
-        const nIdx = text.indexOf('\n', pos);
+        DELIM.lastIndex = pos;
+        const dm = DELIM.exec(text);
         let end = n;
         let kind = 2;
-        if (cIdx !== -1 && cIdx < end) { end = cIdx; kind = 0; }
-        if (nIdx !== -1 && nIdx < end) { end = nIdx; kind = 1; }
-        const rIdx = text.indexOf('\r', pos);
-        if (rIdx !== -1 && rIdx < end && !(kind === 1 && rIdx === end - 1)) {
+        if (dm !== null) {
+          end = dm.index;
+          const dc = dm[0].charCodeAt(0);
+          kind = dc === 44 ? 0 : dc === 10 ? 1 : 3;
+        }
+        if (kind === 3) {
+          if (end + 1 < n && text.charCodeAt(end + 1) === 10) {
+            fields.push(text.slice(pos, end));
+            pos = end + 2;
+            line += 1;
+            ended = 1;
+            continue;
+          }
           const f = unq('');
           fields.push(f.value);
           ended = f.ended;
